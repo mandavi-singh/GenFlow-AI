@@ -13,7 +13,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Chat · Research · Docs (RAG) · Voice — sab kuch tumhare PC par, koi data bahar nahi jata.
+Chat · Research · Docs (RAG) · Voice .
 
 </div>
 
