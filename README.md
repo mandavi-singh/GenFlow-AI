@@ -129,22 +129,13 @@ genflow serve 0.0.0.0 8000
 4. **Sidebar** — history: click to open, double-click to rename, x to delete, + for new chat
 5. **Model dropdown** (top-left) — switch models anytime
 
-<details>
-<summary><b>Screenshots</b></summary>
+## Screenshots
 
-### Chat
-
-![Chat](docs/screenshot-chat.png)
-
-### Research
+| Chat | Docs (RAG) |
+|---|---|
+| ![Chat](docs/screenshot-chat.png) | ![Docs](docs/screenshot-docs.png) |
 
 ![Research](docs/screenshot-research.png)
-
-### Docs (RAG)
-
-![Docs](docs/screenshot-docs.png)
-
-</details>
 
 ## API Endpoints
 
