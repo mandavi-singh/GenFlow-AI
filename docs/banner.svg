@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-label="GenFlow-AI banner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="400" fill="url(#bg)"/>
+  <g opacity="0.35">
+    <circle cx="1050" cy="70" r="180" fill="#3b82f6" opacity="0.08"/>
+    <circle cx="1130" cy="140" r="110" fill="#8b5cf6" opacity="0.08"/>
+    <circle cx="120" cy="340" r="150" fill="#06b6d4" opacity="0.07"/>
+  </g>
+  <rect x="60" y="60" width="6" height="280" fill="url(#accent)"/>
+  <text x="100" y="185" font-family="Segoe UI, system-ui, sans-serif" font-size="72" font-weight="800" fill="#f1f5f9" letter-spacing="1">GenFlow<tspan fill="#3b82f6">-AI</tspan></text>
+  <text x="104" y="235" font-family="Segoe UI, system-ui, sans-serif" font-size="24" fill="#94a3b8">Multi-agent GenAI research assistant - LangChain · LangGraph · MCP · RAG</text>
+  <rect x="104" y="270" width="180" height="36" rx="18" fill="#334155" opacity="0.7"/>
+  <text x="194" y="294" font-family="Segoe UI, system-ui, sans-serif" font-size="15" fill="#e2e8f0" text-anchor="middle">100% Local</text>
+  <rect x="296" y="270" width="180" height="36" rx="18" fill="#334155" opacity="0.7"/>
+  <text x="386" y="294" font-family="Segoe UI, system-ui, sans-serif" font-size="15" fill="#e2e8f0" text-anchor="middle">No API Keys</text>
+  <rect x="488" y="270" width="180" height="36" rx="18" fill="#334155" opacity="0.7"/>
+  <text x="578" y="294" font-family="Segoe UI, system-ui, sans-serif" font-size="15" fill="#e2e8f0" text-anchor="middle">Voice Enabled</text>
+  <g filter="url(#glow)">
+    <circle cx="1010" cy="200" r="90" fill="none" stroke="url(#accent)" stroke-width="3"/>
+    <circle cx="1010" cy="200" r="64" fill="none" stroke="#334155" stroke-width="2"/>
+    <circle cx="946" cy="200" r="14" fill="#3b82f6"/>
+    <circle cx="1074" cy="200" r="14" fill="#8b5cf6"/>
+    <circle cx="1010" cy="136" r="14" fill="#06b6d4"/>
+    <circle cx="1010" cy="264" r="14" fill="#f59e0b"/>
+    <path d="M 946 200 Q 1010 200 1074 200" stroke="#475569" stroke-width="1.5" fill="none" opacity="0.8"/>
+    <path d="M 1010 136 Q 1010 200 1010 264" stroke="#475569" stroke-width="1.5" fill="none" opacity="0.8"/>
+    <path d="M 946 200 Q 990 160 1010 136" stroke="#475569" stroke-width="1.5" fill="none" opacity="0.6"/>
+    <path d="M 1074 200 Q 1030 240 1010 264" stroke="#475569" stroke-width="1.5" fill="none" opacity="0.6"/>
+  </g>
+  <text x="1010" y="325" font-family="Segoe UI, system-ui, sans-serif" font-size="14" fill="#64748b" text-anchor="middle">researcher → writer → critic</text>
+</svg>

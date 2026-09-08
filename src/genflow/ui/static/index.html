@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GenFlow-AI</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; height: 100vh; display: flex; }
+  #sidebar { width: 240px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; }
+  #sidebar .top { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  #new-chat { padding: 10px; border-radius: 8px; border: none; background: #3b82f6; color: white; font-size: 13px; cursor: pointer; }
+  #new-chat:hover { background: #2563eb; }
+  #chat-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+  .chat-item { padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; color: #94a3b8; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .chat-item:hover { background: #334155; color: #e2e8f0; }
+  .chat-item.active { background: #3b82f6; color: white; }
+  .chat-item .del { visibility: hidden; color: #f87171; font-weight: bold; padding: 0 4px; }
+  .chat-item:hover .del { visibility: visible; }
+  .chat-item .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  header { padding: 14px 24px; background: #1e293b; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #334155; }
+  header h1 { font-size: 17px; }
+  select#model { background: #0f172a; color: #94a3b8; border: 1px solid #334155; border-radius: 7px; padding: 5px 8px; font-size: 12px; margin-left: 12px; max-width: 160px; }
+  .tabs { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .tabs button { padding: 6px 16px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; cursor: pointer; font-size: 13px; }
+  .tabs button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+  #chat { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 80%; padding: 12px 16px; border-radius: 12px; white-space: pre-wrap; line-height: 1.5; font-size: 14px; }
+  .user { align-self: flex-end; background: #3b82f6; color: white; }
+  .bot { align-self: flex-start; background: #1e293b; border: 1px solid #334155; }
+  .thinking { align-self: flex-start; color: #64748b; font-style: italic; }
+  form { padding: 16px 24px; display: flex; gap: 8px; background: #1e293b; border-top: 1px solid #334155; }
+  input { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; font-size: 14px; outline: none; }
+  input:focus { border-color: #3b82f6; }
+  button.send { padding: 0 24px; border-radius: 10px; border: none; background: #3b82f6; color: white; font-size: 14px; cursor: pointer; }
+  button.send:disabled { background: #334155; cursor: wait; }
+  #mic { padding: 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; font-size: 18px; cursor: pointer; }
+  #mic.rec { background: #ef4444; border-color: #ef4444; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: 0.6; } }
+  #speak { padding: 0 14px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #94a3b8; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  #speak.on { background: #22c55e; border-color: #22c55e; color: white; }
+  #overlay { position: fixed; inset: 0; background: #0f172af2; display: flex; align-items: center; justify-content: center; z-index: 99; }
+  #overlay .box { background: #1e293b; border: 1px solid #334155; padding: 32px; border-radius: 14px; text-align: center; }
+  #overlay input { margin: 12px 0; width: 240px; }
+  #overlay button { padding: 10px 24px; border-radius: 8px; border: none; background: #3b82f6; color: white; cursor: pointer; }
+  #clear-all { margin: 8px 14px 0; padding: 8px; border-radius: 7px; border: 1px solid #7f1d1d; background: transparent; color: #f87171; font-size: 12px; cursor: pointer; }
+  #clear-all:hover { background: #7f1d1d; }
+</style>
+</head>
+<body>
+<div id="overlay" style="display:none">
+  <div class="box">
+    <h2>🔒 GenFlow-AI</h2>
+    <p style="color:#94a3b8;font-size:13px">Enter password to access chat history</p>
+    <input type="password" id="pwd" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <br>
+    <button onclick="doLogin()">Unlock</button>
+    <p id="pwd-error" style="color:#f87171;font-size:12px"></p>
+  </div>
+</div>
+<div id="sidebar">
+  <div class="top">
+    <button id="new-chat" onclick="newChat()">+ New chat</button>
+    <select id="model" onchange="setModel(this.value)" title="Model switch"></select>
+    <button id="clear-all" onclick="clearHistory()">Clear all history</button>
+  </div>
+  <div id="chat-list"></div>
+</div>
+<div id="main">
+<header>
+  <h1>GenFlow-AI</h1>
+  <div class="tabs">
+    <button id="tab-chat" class="active" onclick="setMode('chat')">Chat</button>
+    <button id="tab-research" onclick="setMode('research')">Research</button>
+    <button id="tab-docs" onclick="setMode('docs')">Docs</button>
+    <button id="upload-btn" style="display:none" onclick="document.getElementById('file-input').click()">Upload</button>
+    <input type="file" id="file-input" style="display:none" onchange="uploadFile(this)">
+  </div>
+</header>
+<div id="chat"><div class="msg bot">Hello! I'm GenFlow-AI, your local research assistant. How can I help you today?</div><div id="doclist" class="msg bot" style="display:none; background:#0c1524; font-size:12px;"></div></div>
+<form id="form" onsubmit="return send(event)">
+  <button id="mic" type="button" onclick="toggleMic()" title="Speak your question">&#127908;</button>
+  <input id="input" placeholder="Type your message..." autofocus autocomplete="off">
+  <button class="send" id="btn" type="submit">Send</button>
+  <button id="speak" type="button" onclick="toggleSpeak()" title="Turn on to hear answers">&#128266; Off</button>
+</form>
+</div>
+<script>
+let mode = "chat";
+let history = [];
+let chatId = null;
+const chat = document.getElementById("chat");
+
+let mediaStream = null;
+let mediaRec = null;
+let audioChunks = [];
+let listening = false;
+let speakOn = false;
+
+function api(path, opts) {
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  const token = localStorage.getItem("gf_token");
+  if (token) opts.headers["Authorization"] = "Bearer " + token;
+  return fetch(path, opts);
+}
+
+function clearHistory() {
+  if (!confirm("This will delete ALL chat history. Are you sure?")) return;
+  api("/api/chats", {method: "DELETE"})
+    .then(() => { newChat(); })
+    .catch(err => add("Clear error: " + err, "bot"));
+}
+
+async function checkAuth() {
+  try {
+    const r = await api("/api/auth/status");
+    const data = await r.json();
+    if (data.required && !localStorage.getItem("gf_token")) {
+      document.getElementById("overlay").style.display = "flex";
+      return false;
+    }
+    document.getElementById("overlay").style.display = "none";
+    return true;
+  } catch (err) {
+    return true;
+  }
+}
+
+async function doLogin() {
+  const pwd = document.getElementById("pwd").value;
+  try {
+    const r = await api("/api/auth/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({password: pwd})
+    });
+    if (r.ok) {
+      const data = await r.json();
+      localStorage.setItem("gf_token", data.token);
+      document.getElementById("overlay").style.display = "none";
+      document.getElementById("pwd-error").textContent = "";
+      loadChats();
+    } else {
+      document.getElementById("pwd-error").textContent = "Wrong password!";
+    }
+  } catch (err) {
+    document.getElementById("pwd-error").textContent = "Login error: " + err;
+  }
+}
+
+async function loadChats() {
+  try {
+    const r = await api("/api/chats");
+    const chats = await r.json();
+    const list = document.getElementById("chat-list");
+    list.innerHTML = "";
+    chats.forEach(c => {
+      const item = document.createElement("div");
+      item.className = "chat-item" + (c.id === chatId ? " active" : "");
+      const title = document.createElement("span");
+      title.className = "title";
+      title.textContent = c.title;
+      title.title = "Double-click to rename";
+      const del = document.createElement("span");
+      del.className = "del";
+      del.textContent = "x";
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        await api("/api/chats/" + c.id, {method: "DELETE"});
+        if (chatId === c.id) newChat();
+        loadChats();
+      };
+      item.appendChild(title);
+      item.appendChild(del);
+      item.onclick = () => openChat(c.id);
+      title.ondblclick = (e) => {
+        e.stopPropagation();
+        const t = prompt("Rename chat:", c.title);
+        if (t && t.trim()) {
+          api("/api/chats/" + c.id, {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({title: t.trim()})}).then(loadChats);
+        }
+      };
+      list.appendChild(item);
+    });
+  } catch (err) { }
+}
+
+function newChat() {
+  chatId = null;
+  history = [];
+  chat.innerHTML = "";
+  add("Hello! I'm GenFlow-AI. New chat started. How can I help you?", "bot");
+  const panel = document.getElementById("doclist");
+  if (panel) panel.style.display = mode === "docs" ? "" : "none";
+  loadChats();
+}
+
+async function openChat(id) {
+  try {
+    const r = await api("/api/chats/" + id);
+    const data = await r.json();
+    chatId = id;
+    history = data.messages || [];
+    chat.innerHTML = "";
+    history.forEach(m => add(m.content, m.role === "user" ? "user" : "bot"));
+    const panel = document.getElementById("doclist");
+    if (panel) panel.style.display = "none";
+    loadChats();
+  } catch (err) {
+    add("Chat load error: " + err, "bot");
+  }
+}
+
+async function loadModels() {
+  try {
+    const r = await api("/api/models");
+    const data = await r.json();
+    const sel = document.getElementById("model");
+    sel.innerHTML = "";
+    (data.available || []).forEach(m => {
+      const o = document.createElement("option");
+      o.value = m; o.textContent = m;
+      if (m === data.current) o.selected = true;
+      sel.appendChild(o);
+    });
+  } catch (err) { }
+}
+
+async function setModel(m) {
+  try {
+    await api("/api/model", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({model: m})});
+    add("Model switched to: " + m, "bot");
+  } catch (err) {
+    add("Model switch error: " + err, "bot");
+  }
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById("tab-chat").classList.toggle("active", m === "chat");
+  document.getElementById("tab-research").classList.toggle("active", m === "research");
+  document.getElementById("tab-docs").classList.toggle("active", m === "docs");
+  document.getElementById("upload-btn").style.display = m === "docs" ? "" : "none";
+  const panel = document.getElementById("doclist");
+  panel.style.display = m === "docs" ? "" : "none";
+  if (m === "docs") loadDocList();
+  document.getElementById("input").placeholder = (
+    m === "chat" ? "Type your message..." :
+    m === "research" ? "Type your research query..." :
+    "Ask about your uploaded documents...");
+}
+
+async function loadDocList() {
+  try {
+    const r = await api("/api/rag/status");
+    const data = await r.json();
+    const panel = document.getElementById("doclist");
+    if (!panel) return;
+    if (!data.files || data.files.length === 0) {
+      panel.innerHTML = "<i>No documents yet - upload one</i>";
+    } else {
+      panel.innerHTML = "<b>Indexed documents:</b><br>" +
+        data.files.map(f => "&#128196; " + f).join("<br>") +
+        "<br><small>" + (data.indexed ? "Index ready" : "Not indexed - re-upload needed") + "</small>";
+    }
+  } catch (err) { }
+}
+
+async function uploadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = "";
+  add("Uploading " + file.name + "...", "thinking");
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const r = await api("/api/rag/upload", {method: "POST", body: fd});
+    const data = await r.json();
+    add("Indexed " + (data.indexed_files || 0) + " file(s), " + (data.chunks || 0) + " chunks.", "bot");
+    loadDocList();
+  } catch (err) {
+    add("Upload error: " + err, "bot");
+  }
+}
+
+function add(text, cls) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  d.textContent = text;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+  return d;
+}
+
+async function send(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById("input");
+  const btn = document.getElementById("btn");
+  const text = input.value.trim();
+  if (!text) return false;
+  input.value = "";
+  add(text, "user");
+  btn.disabled = true;
+  const thinking = add(mode === "docs" ? "searching documents..." : mode === "chat" ? "thinking..." : "agents are researching... (10-60s)", "thinking");
+  try {
+    let path, key, body;
+    if (mode === "docs") {
+      path = "/api/rag/ask"; key = "answer"; body = {question: text};
+    } else if (mode === "chat") {
+      path = "/api/chat"; key = "reply"; body = {message: text, chat_id: chatId, history: history.slice(-10)};
+    } else {
+      path = "/api/research"; key = "report"; body = {query: text, chat_id: chatId};
+    }
+    const r = await api(path, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+    if (r.status === 401) {
+      thinking.remove();
+      localStorage.removeItem("gf_token");
+      document.getElementById("overlay").style.display = "flex";
+      return false;
+    }
+    thinking.remove();
+    const reply = data[key] || JSON.stringify(data);
+    add(reply, "bot");
+    speak(reply);
+    if (mode !== "docs") {
+      chatId = data.chat_id || chatId;
+      history.push({role: "user", content: text}, {role: "assistant", content: reply});
+      loadChats();
+    }
+  } catch (err) {
+    thinking.remove();
+    add("Error: " + err, "bot");
+  }
+  btn.disabled = false;
+  input.focus();
+  return false;
+}
+
+async function toggleMic() {
+  const mic = document.getElementById("mic");
+  const input = document.getElementById("input");
+  if (listening) {
+    mediaRec.stop();
+    return;
+  }
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    add("Voice recording is not supported in this browser.", "bot");
+    return;
+  }
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({audio: true});
+  } catch (err) {
+    add("Mic blocked: " + err.name + " - allow microphone from the browser address bar", "bot");
+    return;
+  }
+  audioChunks = [];
+  mediaRec = new MediaRecorder(mediaStream);
+  mediaRec.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+  mediaRec.onstop = async () => {
+    listening = false;
+    mic.classList.remove("rec");
+    input.placeholder = "Type your message...";
+    mediaStream.getTracks().forEach(t => t.stop());
+    const blob = new Blob(audioChunks, {type: "audio/webm"});
+    if (blob.size < 2000) {
+      add("Nothing heard - please try again", "bot");
+      return;
+    }
+    const think = add("transcribing locally (Whisper)...", "thinking");
+    try {
+      const fd = new FormData();
+      fd.append("file", blob, "speech.webm");
+      const r = await api("/api/stt", {method: "POST", body: fd});
+      const data = await r.json();
+      think.remove();
+      if (data.text && data.text.trim()) {
+        input.value = data.text.trim();
+        send(null);
+      } else {
+        add("Could not understand - please speak again", "bot");
+      }
+    } catch (err) {
+      think.remove();
+      add("STT error: " + err, "bot");
+    }
+  };
+  mediaRec.start();
+  listening = true;
+  mic.classList.add("rec");
+  input.placeholder = "Speak... (press again to stop)";
+}
+
+function toggleSpeak() {
+  const btn = document.getElementById("speak");
+  speakOn = !speakOn;
+  btn.classList.toggle("on", speakOn);
+  btn.innerHTML = speakOn ? "&#128266; On" : "&#128266; Off";
+  if (!speakOn && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function speak(text) {
+  if (!speakOn || !window.speechSynthesis) return;
+  const clean = text.replace(/[*#`_|>\[\]()]/g, " ").slice(0, 600);
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = "en-IN";
+  u.rate = 1.05;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
+checkAuth().then(ok => {
+  if (ok) {
+    loadChats();
+    loadModels();
+  }
+});
+</script>
+</body>
+</html>

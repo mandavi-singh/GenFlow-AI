@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# Local user data - never push personal documents/chat history
+data/docs/*
+data/chats.json
+data/index.json
+!data/docs/.gitkeep
+
+# Hugging Face Space build artifacts
+hf-space/
