@@ -132,16 +132,17 @@ genflow serve 0.0.0.0 8000
 <details>
 <summary><b>Screenshots</b></summary>
 
-> Chat, Research aur Docs tabs ke screenshots yahan add karne hain:
-> `docs/screenshot-chat.png`, `docs/screenshot-research.png`, `docs/screenshot-docs.png`
->
-> App chala kar (Ctrl+PrtScn ya Win+Shift+S) le lo, `docs/` folder mein save karo, phir yahan embed:
->
-> ```markdown
-> | Chat | Docs (RAG) |
-> |---|---|
-> | ![Chat](docs/screenshot-chat.png) | ![Docs](docs/screenshot-docs.png) |
-> ```
+### Chat
+
+![Chat](docs/screenshot-chat.png)
+
+### Research
+
+![Research](docs/screenshot-research.png)
+
+### Docs (RAG)
+
+![Docs](docs/screenshot-docs.png)
 
 </details>
 
