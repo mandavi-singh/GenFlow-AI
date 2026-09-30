@@ -1,12 +1,15 @@
 import os
+import re
 from pathlib import Path
 
 from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from genflow.config import settings
+from genflow.flows.research_flow import _script_hint, force_roman_if_typed, strip_emojis
 from genflow.llm import ainvoke_with_retry, get_llm
 
 _DATA_DIR = Path(os.getenv("GENFLOW_DATA_DIR", Path(__file__).resolve().parents[2] / "data"))
@@ -14,6 +17,22 @@ DOCS_DIR = _DATA_DIR / "docs"
 INDEX_PATH = _DATA_DIR / "index.json"
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
+
+_PDF_WORDS = {"pdf", "pd", "pdfs"}
+_PPT_WORDS = {"ppt", "pptx", "powerpoint", "slide", "slides", "presentation"}
+
+
+def _wanted_extensions(question: str) -> list[str]:
+    """Detect document types the user asked about, by exact word token.
+
+    Token matching avoids substring false positives like 'pd' inside 'update'."""
+    tokens = set(re.findall(r"[a-z]+", question.lower()))
+    exts: list[str] = []
+    if tokens & _PDF_WORDS:
+        exts.append(".pdf")
+    if tokens & _PPT_WORDS:
+        exts.append(".pptx")
+    return exts
 
 _splitter = RecursiveCharacterTextSplitter(
     chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP, separators=["\n\n", "\n", ". ", " "]
@@ -94,10 +113,11 @@ def ingest_directory(directory: Path | None = None) -> dict:
             docs.append(Document(page_content=chunk, metadata={"source": f.name, "chunk": i}))
     if not docs:
         return {"indexed_files": 0, "chunks": 0}
-    store = _get_store()
-    store.add_documents(docs)
+    global _store
+    _store = InMemoryVectorStore(_get_embeddings())
+    _store.add_documents(docs)
     INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    store.dump(str(INDEX_PATH))
+    _store.dump(str(INDEX_PATH))
     return {"indexed_files": len(files), "chunks": len(docs)}
 
 
@@ -106,12 +126,13 @@ def search(query: str, k: int = 4) -> list[Document]:
         return []
     store = _get_store()
     hits = store.similarity_search(query, k=24)
-    ql = query.lower()
-    for word, ext in (("pdf", ".pdf"), ("ppt", ".pptx"), ("powerpoint", ".pptx"), ("slide", ".pptx")):
-        if word in ql:
-            filtered = [h for h in hits if ext in h.metadata.get("source", "").lower()]
-            hits = filtered or hits
-            break
+    wanted = _wanted_extensions(query)
+    if wanted:
+        filtered = [
+            h for h in hits
+            if any(e in h.metadata.get("source", "").lower() for e in wanted)
+        ]
+        hits = filtered or hits
     by_source: dict[str, list[Document]] = {}
     for h in hits:
         src = h.metadata.get("source", "?")
@@ -150,13 +171,10 @@ def _filename_fallback(question: str) -> list[Document]:
     return docs
 
 
-async def answer_from_docs(question: str) -> str:
+def _build_docs_messages(question: str) -> tuple[list[BaseMessage] | None, str]:
+    """Return (messages, fallback). When messages is None, fallback holds the reply."""
     ql = question.lower()
-    wanted_exts: list[str] = []
-    if "pdf" in ql:
-        wanted_exts.append(".pdf")
-    if any(w in ql for w in ("ppt", "powerpoint", "slide")):
-        wanted_exts.append(".pptx")
+    wanted_exts = _wanted_extensions(question)
     wanted_sources: list[str] = []
     if DOCS_DIR.exists():
         for p in DOCS_DIR.iterdir():
@@ -181,14 +199,10 @@ async def answer_from_docs(question: str) -> str:
     else:
         hits = search(question, k=6)
     if not hits:
-        return "No documents indexed. Add files to data/docs and call /api/rag/ingest."
+        return None, "No documents indexed. Add files to data/docs and call /api/rag/ingest."
     context = "\n\n---\n\n".join(
         f"[{h.metadata['source']}]\n{h.page_content}" for h in hits
     )
-    from langchain_core.messages import HumanMessage, SystemMessage
-
-    from genflow.flows.research_flow import _script_hint
-
     messages = [
         SystemMessage(
             "You are GenFlow-AI answering questions about the user's uploaded "
@@ -199,11 +213,28 @@ async def answer_from_docs(question: str) -> str:
             "'is ppt me kya h'), summarize the key points from the context. "
             "3) Mention the source file name(s) used. "
             "4) Do NOT use emojis unless the user explicitly asks. "
+            "5) Be concise: keep the answer under about 200 words unless the "
+            "user explicitly asks for detail. "
             + _script_hint(question)
         ),
         HumanMessage(f"Context:\n{context}\n\nQuestion: {question}"),
     ]
-    reply = await ainvoke_with_retry(get_llm(), messages)
-    from genflow.flows.research_flow import force_roman_if_typed, strip_emojis
+    return messages, ""
 
+
+async def answer_from_docs(question: str) -> str:
+    messages, fallback = _build_docs_messages(question)
+    if messages is None:
+        return fallback
+    reply = await ainvoke_with_retry(get_llm(), messages)
     return strip_emojis(force_roman_if_typed(question, reply.content))
+
+
+async def stream_answer_from_docs(question: str):
+    """Yield answer tokens as they are generated (post-processing applied by the caller)."""
+    messages, fallback = _build_docs_messages(question)
+    if messages is None:
+        yield fallback
+        return
+    async for chunk in get_llm().astream(messages):
+        yield chunk.content or ""

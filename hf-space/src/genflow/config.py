@@ -13,7 +13,7 @@ class Settings:
     temperature: float = float(os.getenv("GENFLOW_TEMPERATURE", "0.2"))
     max_revisions: int = int(os.getenv("GENFLOW_MAX_REVISIONS", "2"))
     password: str = os.getenv("GENFLOW_PASSWORD", "")
-    num_predict: int = int(os.getenv("GENFLOW_NUM_PREDICT", "400"))
+    num_predict: int = int(os.getenv("GENFLOW_NUM_PREDICT", "900"))
     num_ctx: int = int(os.getenv("GENFLOW_NUM_CTX", "2048"))
 
 

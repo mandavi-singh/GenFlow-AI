@@ -81,6 +81,17 @@ def force_roman(text: str) -> str:
 
 
 async def run_chat_flow(question: str, history: list[BaseMessage] | None = None) -> str:
+    reply = await ainvoke_with_retry(get_llm(), _chat_messages(question, history))
+    return strip_emojis(force_roman_if_typed(question, reply.content))
+
+
+async def stream_chat_flow(question: str, history: list[BaseMessage] | None = None):
+    """Yield reply tokens as they are generated (post-processing applied by the caller)."""
+    async for chunk in get_llm().astream(_chat_messages(question, history)):
+        yield chunk.content or ""
+
+
+def _chat_messages(question: str, history: list[BaseMessage] | None = None) -> list[BaseMessage]:
     messages: list[BaseMessage] = [
         SystemMessage(
             "You are GenFlow-AI, a helpful assistant. "
@@ -93,8 +104,7 @@ async def run_chat_flow(question: str, history: list[BaseMessage] | None = None)
     ]
     messages.extend(_trim(history or []))
     messages.append(HumanMessage(question))
-    reply = await ainvoke_with_retry(get_llm(), messages)
-    return strip_emojis(force_roman_if_typed(question, reply.content))
+    return messages
 
 
 def to_langchain_history(raw: list[dict]) -> list[BaseMessage]:

@@ -1,16 +1,21 @@
+import asyncio
 import secrets
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from genflow import rag
 from genflow.config import settings
 from genflow.flows.research_flow import (
+    force_roman_if_typed,
     run_chat_flow,
     run_research_flow,
+    stream_chat_flow,
+    strip_emojis,
     to_langchain_history,
 )
 from genflow.store import (
@@ -23,11 +28,42 @@ from genflow.store import (
     rename_chat,
 )
 
-app = FastAPI(title="GenFlow-AI")
+
+def _warmup_model() -> None:
+    """Ask Ollama to load the model into memory so the first request is not slow."""
+    import json as _json
+    import urllib.request
+    from urllib.error import URLError
+
+    payload = _json.dumps(
+        {"model": settings.model, "prompt": "", "stream": False}
+    ).encode()
+    try:
+        req = urllib.request.Request(
+            f"{settings.base_url}/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=180) as r:
+            r.read()
+    except (URLError, OSError, ValueError):
+        pass
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(asyncio.to_thread(_warmup_model))
+    yield
+
+
+app = FastAPI(title="GenFlow-AI", lifespan=lifespan)
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 SESSION_TOKEN = secrets.token_hex(16)
+
+ALLOWED_DOC_SUFFIXES = {".txt", ".md", ".pdf", ".pptx", ".py", ".json", ".csv"}
+MAX_DOC_BYTES = 25 * 1024 * 1024
 
 
 @app.middleware("http")
@@ -181,9 +217,17 @@ def rag_ingest():
 
 @app.post("/api/rag/upload")
 async def rag_upload(file: UploadFile):
+    name = Path(file.filename).name
+    if Path(name).suffix.lower() not in ALLOWED_DOC_SUFFIXES:
+        raise HTTPException(
+            400, f"unsupported file type: {Path(name).suffix or 'none'}"
+        )
+    data = await file.read()
+    if len(data) > MAX_DOC_BYTES:
+        raise HTTPException(413, f"file too large (max {MAX_DOC_BYTES // (1024 * 1024)} MB)")
     rag.DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    dest = rag.DOCS_DIR / Path(file.filename).name
-    dest.write_bytes(await file.read())
+    dest = rag.DOCS_DIR / name
+    dest.write_bytes(data)
     result = rag.ingest_directory()
     return {"saved": str(dest), **result}
 
@@ -230,3 +274,48 @@ async def api_set_model(req: ModelRequest):
 
     llm_mod._model_override = req.model
     return {"model": req.model}
+
+
+def _sse(event: dict) -> str:
+    import json as _json
+
+    return f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(req: ChatRequest):
+    async def generate():
+        chat_id = req.chat_id
+        if not chat_id or get_chat(chat_id) is None:
+            chat_id = create_chat(req.message[:40])["id"]
+        history = to_langchain_history(req.history)
+        tokens = []
+        try:
+            async for token in stream_chat_flow(req.message, history):
+                tokens.append(token)
+                yield _sse({"token": token})
+        except Exception as exc:
+            yield _sse({"error": _friendly_error(exc)})
+            return
+        reply = strip_emojis(force_roman_if_typed(req.message, "".join(tokens)))
+        add_messages(chat_id, req.message, reply)
+        yield _sse({"done": True, "chat_id": chat_id, "reply": reply})
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@app.post("/api/rag/ask/stream")
+async def rag_ask_stream(req: RagQuestion):
+    async def generate():
+        tokens = []
+        try:
+            async for token in rag.stream_answer_from_docs(req.question):
+                tokens.append(token)
+                yield _sse({"token": token})
+        except Exception as exc:
+            yield _sse({"error": _friendly_error(exc)})
+            return
+        reply = strip_emojis(force_roman_if_typed(req.question, "".join(tokens)))
+        yield _sse({"done": True, "reply": reply})
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
