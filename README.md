@@ -34,9 +34,9 @@ Upload your own PDFs, PPTX or notes and query them in your own language, run mul
 
 | Feature | Description |
 |---|---|
-| **Chat** | Conversational AI with memory + persistent history (JSON store) |
+| **Chat** | Conversational AI with memory + persistent history (JSON store), streamed token-by-token |
 | **Research** | Multi-agent pipeline: researcher (ReAct + tools) → writer → critic loop; grounds in your uploaded documents |
-| **Docs (RAG)** | Upload PDF / PPTX / TXT / MD — ask questions answered from your documents |
+| **Docs (RAG)** | Upload PDF / PPTX / TXT / MD — ask questions answered from your documents, streamed |
 | **Voice** | Local Whisper speech-to-text (mic) + browser text-to-speech |
 | **Hindi / Hinglish** | Roman typing → Hinglish reply; Hindi speech → natural Hindi reply |
 | **Chat sidebar** | ChatGPT-style: list, open, rename (double-click), delete, new chat |
@@ -159,9 +159,11 @@ genflow serve 0.0.0.0 8000
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/chat` | Chat reply (with history) |
+| `POST` | `/api/chat/stream` | Chat reply as server-sent events (token stream) |
 | `POST` | `/api/research` | Multi-agent research report |
-| `POST` | `/api/rag/upload` | Upload document for RAG |
+| `POST` | `/api/rag/upload` | Upload document for RAG (type + 25 MB limit) |
 | `POST` | `/api/rag/ask` | Ask question over indexed docs |
+| `POST` | `/api/rag/ask/stream` | Docs answer as server-sent events (token stream) |
 | `POST` | `/api/rag/ingest` | Re-index documents folder |
 | `POST` | `/api/stt` | Speech-to-text (audio file) |
 | `GET/POST` | `/api/models`, `/api/model` | List / switch Ollama models |

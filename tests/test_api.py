@@ -78,3 +78,61 @@ def test_models_endpoint_reports_current(client):
     resp = client.get("/api/models")
     assert resp.status_code == 200
     assert "current" in resp.json()
+
+
+def test_chat_stream_yields_tokens_then_done(client, monkeypatch):
+    async def fake_stream(question, history):
+        for token in ("hello", " world"):
+            yield token
+
+    monkeypatch.setattr(srv, "stream_chat_flow", fake_stream)
+
+    resp = client.post("/api/chat/stream", json={"message": "hi"})
+    assert resp.status_code == 200
+    assert '"token": "hello"' in resp.text
+    assert '"token": " world"' in resp.text
+    assert '"done": true' in resp.text
+
+    chats = client.get("/api/chats").json()
+    assert len(chats) == 1
+    assert chats[0]["messages_count"] == 2
+
+
+def test_rag_ask_stream_yields_tokens(client, monkeypatch):
+    async def fake_stream(question):
+        for token in ("budget", " is 4.2 crore"):
+            yield token
+
+    monkeypatch.setattr(rag, "stream_answer_from_docs", fake_stream)
+
+    resp = client.post("/api/rag/ask/stream", json={"question": "budget?"})
+    assert resp.status_code == 200
+    assert "budget is 4.2 crore" in resp.text
+
+
+def test_upload_rejects_unsupported_type(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(rag, "DOCS_DIR", tmp_path / "docs")
+    resp = client.post(
+        "/api/rag/upload", files={"file": ("bad.exe", b"MZ", "application/octet-stream")}
+    )
+    assert resp.status_code == 400
+
+
+def test_upload_rejects_oversized_file(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(rag, "DOCS_DIR", tmp_path / "docs")
+    monkeypatch.setattr(rag, "ingest_directory", lambda: {"indexed_files": 1, "chunks": 1})
+    big = b"a" * (srv.MAX_DOC_BYTES + 1)
+    resp = client.post(
+        "/api/rag/upload", files={"file": ("big.txt", big, "text/plain")}
+    )
+    assert resp.status_code == 413
+
+
+def test_upload_accepts_supported_file(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(rag, "DOCS_DIR", tmp_path / "docs")
+    monkeypatch.setattr(rag, "ingest_directory", lambda: {"indexed_files": 1, "chunks": 1})
+    resp = client.post(
+        "/api/rag/upload", files={"file": ("note.txt", b"hello world", "text/plain")}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["saved"].endswith("note.txt")

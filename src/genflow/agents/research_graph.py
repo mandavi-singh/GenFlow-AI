@@ -66,6 +66,10 @@ async def critic(state: ResearchState) -> dict:
         [
             SystemMessage(
                 "You are the Critic. Judge the report for accuracy, completeness and clarity."
+                " You have no internet access and cannot check external sources, so never "
+                " claim to have verified anything against websites, public records or "
+                " authorities. Judge only internal consistency and how well the report "
+                " reflects the researcher's findings."
                 "Reply REJECT with one improvement request, or APPROVE if it is good."
             ),
             HumanMessage(f"Query: {state.query}\n\nReport:\n{state.report}"),

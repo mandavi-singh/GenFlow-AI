@@ -295,6 +295,39 @@ function add(text, cls) {
   return d;
 }
 
+async function streamSSE(path, body, onToken) {
+  const r = await api(path, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body)
+  });
+  if (r.status === 401) {
+    localStorage.removeItem("gf_token");
+    document.getElementById("overlay").style.display = "flex";
+    throw new Error("unauthorized");
+  }
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const {value, done} = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, {stream: true});
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop();
+    for (const part of parts) {
+      if (!part.startsWith("data: ")) continue;
+      let evt;
+      try { evt = JSON.parse(part.slice(6)); } catch (e) { continue; }
+      if (evt.error) throw new Error(evt.error);
+      if (evt.done) return evt;
+      if (evt.token) onToken(evt.token);
+    }
+  }
+  return null;
+}
+
 async function send(e) {
   if (e) e.preventDefault();
   const input = document.getElementById("input");
@@ -304,36 +337,55 @@ async function send(e) {
   input.value = "";
   add(text, "user");
   btn.disabled = true;
-  const thinking = add(mode === "docs" ? "searching documents..." : mode === "chat" ? "thinking..." : "agents are researching... (10-60s)", "thinking");
+  const thinking = add(mode === "docs" ? "searching documents..." : mode === "chat" ? "thinking..." : "agents are researching... (2-5 min)", "thinking");
   try {
-    let path, key, body;
-    if (mode === "docs") {
-      path = "/api/rag/ask"; key = "answer"; body = {question: text};
-    } else if (mode === "chat") {
-      path = "/api/chat"; key = "reply"; body = {message: text, chat_id: chatId, history: history.slice(-10)};
-    } else {
-      path = "/api/research"; key = "report"; body = {query: text, chat_id: chatId};
-    }
-    const r = await api(path, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(body)
-    });
-    const data = await r.json();
-    if (r.status === 401) {
+    if (mode === "research") {
+      const r = await api("/api/research", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({query: text, chat_id: chatId})
+      });
+      const data = await r.json();
+      if (r.status === 401) {
+        thinking.remove();
+        localStorage.removeItem("gf_token");
+        document.getElementById("overlay").style.display = "flex";
+        return false;
+      }
       thinking.remove();
-      localStorage.removeItem("gf_token");
-      document.getElementById("overlay").style.display = "flex";
-      return false;
-    }
-    thinking.remove();
-    const reply = data[key] || JSON.stringify(data);
-    add(reply, "bot");
-    speak(reply);
-    if (mode !== "docs") {
+      const reply = data.report || JSON.stringify(data);
+      add(reply, "bot");
+      speak(reply);
       chatId = data.chat_id || chatId;
       history.push({role: "user", content: text}, {role: "assistant", content: reply});
       loadChats();
+    } else {
+      const isChat = mode === "chat";
+      const path = isChat ? "/api/chat/stream" : "/api/rag/ask/stream";
+      const body = isChat
+        ? {message: text, chat_id: chatId, history: history.slice(-10)}
+        : {question: text};
+      const bubble = add("", "bot");
+      let started = false;
+      const evt = await streamSSE(path, body, (tok) => {
+        if (!started) { started = true; thinking.remove(); }
+        bubble.textContent += tok;
+        chat.scrollTop = chat.scrollHeight;
+      });
+      if (!started) thinking.remove();
+      if (evt && evt.error) {
+        bubble.remove();
+        add("Error: " + evt.error, "bot");
+      } else {
+        if (evt && evt.reply) bubble.textContent = evt.reply;
+        const reply = bubble.textContent;
+        speak(reply);
+        if (isChat) {
+          chatId = (evt && evt.chat_id) || chatId;
+          history.push({role: "user", content: text}, {role: "assistant", content: reply});
+          loadChats();
+        }
+      }
     }
   } catch (err) {
     thinking.remove();

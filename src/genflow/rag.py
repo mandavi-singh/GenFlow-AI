@@ -2,11 +2,13 @@ import os
 from pathlib import Path
 
 from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from genflow.config import settings
+from genflow.flows.research_flow import _script_hint, force_roman_if_typed, strip_emojis
 from genflow.llm import ainvoke_with_retry, get_llm
 
 _DATA_DIR = Path(os.getenv("GENFLOW_DATA_DIR", Path(__file__).resolve().parents[2] / "data"))
@@ -151,7 +153,8 @@ def _filename_fallback(question: str) -> list[Document]:
     return docs
 
 
-async def answer_from_docs(question: str) -> str:
+def _build_docs_messages(question: str) -> tuple[list[BaseMessage] | None, str]:
+    """Return (messages, fallback). When messages is None, fallback holds the reply."""
     ql = question.lower()
     wanted_exts: list[str] = []
     if "pdf" in ql:
@@ -182,14 +185,10 @@ async def answer_from_docs(question: str) -> str:
     else:
         hits = search(question, k=6)
     if not hits:
-        return "No documents indexed. Add files to data/docs and call /api/rag/ingest."
+        return None, "No documents indexed. Add files to data/docs and call /api/rag/ingest."
     context = "\n\n---\n\n".join(
         f"[{h.metadata['source']}]\n{h.page_content}" for h in hits
     )
-    from langchain_core.messages import HumanMessage, SystemMessage
-
-    from genflow.flows.research_flow import _script_hint
-
     messages = [
         SystemMessage(
             "You are GenFlow-AI answering questions about the user's uploaded "
@@ -204,7 +203,22 @@ async def answer_from_docs(question: str) -> str:
         ),
         HumanMessage(f"Context:\n{context}\n\nQuestion: {question}"),
     ]
-    reply = await ainvoke_with_retry(get_llm(), messages)
-    from genflow.flows.research_flow import force_roman_if_typed, strip_emojis
+    return messages, ""
 
+
+async def answer_from_docs(question: str) -> str:
+    messages, fallback = _build_docs_messages(question)
+    if messages is None:
+        return fallback
+    reply = await ainvoke_with_retry(get_llm(), messages)
     return strip_emojis(force_roman_if_typed(question, reply.content))
+
+
+async def stream_answer_from_docs(question: str):
+    """Yield answer tokens as they are generated (post-processing applied by the caller)."""
+    messages, fallback = _build_docs_messages(question)
+    if messages is None:
+        yield fallback
+        return
+    async for chunk in get_llm().astream(messages):
+        yield chunk.content or ""
