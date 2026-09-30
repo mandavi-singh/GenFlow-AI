@@ -4,7 +4,7 @@
 
 # GenFlow-AI
 
-**Multi-agent GenAI research assistant — fully local, zero API keys.**
+**A private, offline AI assistant for Hindi & Hinglish users — fully local, zero API keys.**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?logo=langchain&logoColor=white)](https://langchain.com)
@@ -18,6 +18,17 @@ Chat · Research · Docs (RAG) · Voice.
 </div>
 
 ---
+
+## Why GenFlow?
+
+Cloud AI is expensive, English-first, and uploads your documents to third-party servers. GenFlow runs **entirely on your own CPU** — no API keys, no per-token fees, and nothing ever leaves your machine.
+
+It is built for the users the current AI stack leaves out:
+
+- **Privacy-first workplaces** — clinics, schools, government offices and small businesses that cannot (or will not) upload sensitive documents to a foreign API.
+- **Hindi & Hinglish speakers** — ask in Roman-letter Hindi (`is document mein tax ka rule kya hai?`) and get a natural Hinglish reply; speak in Hindi and get a spoken Hindi answer.
+
+Upload your own PDFs, PPTX or notes and query them in your own language, run multi-agent research reports, or just chat — all offline, on an ordinary laptop.
 
 ## Features
 
