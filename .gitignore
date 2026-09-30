@@ -14,5 +14,3 @@ data/chats.json
 data/index.json
 !data/docs/.gitkeep
 
-# Hugging Face Space build artifacts
-hf-space/
