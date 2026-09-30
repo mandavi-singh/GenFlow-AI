@@ -69,3 +69,15 @@ def test_status_lists_files(tmp_path):
     status = rag.status()
     assert status["files"] == ["report.txt"]
     assert status["indexed"] is False
+
+
+def test_type_routing_by_word_token():
+    assert rag._wanted_extensions("tell me about this pd") == [".pdf"]
+    assert rag._wanted_extensions("show me the pdf") == [".pdf"]
+    assert rag._wanted_extensions("what is in the pptx") == [".pptx"]
+    assert rag._wanted_extensions("summarize the slides") == [".pptx"]
+
+
+def test_type_routing_ignores_false_positives():
+    assert rag._wanted_extensions("please update the notes") == []
+    assert rag._wanted_extensions("what is the capital of france") == []

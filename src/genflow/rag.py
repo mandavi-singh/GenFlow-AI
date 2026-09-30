@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -16,6 +17,22 @@ DOCS_DIR = _DATA_DIR / "docs"
 INDEX_PATH = _DATA_DIR / "index.json"
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100
+
+_PDF_WORDS = {"pdf", "pd", "pdfs"}
+_PPT_WORDS = {"ppt", "pptx", "powerpoint", "slide", "slides", "presentation"}
+
+
+def _wanted_extensions(question: str) -> list[str]:
+    """Detect document types the user asked about, by exact word token.
+
+    Token matching avoids substring false positives like 'pd' inside 'update'."""
+    tokens = set(re.findall(r"[a-z]+", question.lower()))
+    exts: list[str] = []
+    if tokens & _PDF_WORDS:
+        exts.append(".pdf")
+    if tokens & _PPT_WORDS:
+        exts.append(".pptx")
+    return exts
 
 _splitter = RecursiveCharacterTextSplitter(
     chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP, separators=["\n\n", "\n", ". ", " "]
@@ -109,12 +126,13 @@ def search(query: str, k: int = 4) -> list[Document]:
         return []
     store = _get_store()
     hits = store.similarity_search(query, k=24)
-    ql = query.lower()
-    for word, ext in (("pdf", ".pdf"), ("ppt", ".pptx"), ("powerpoint", ".pptx"), ("slide", ".pptx")):
-        if word in ql:
-            filtered = [h for h in hits if ext in h.metadata.get("source", "").lower()]
-            hits = filtered or hits
-            break
+    wanted = _wanted_extensions(query)
+    if wanted:
+        filtered = [
+            h for h in hits
+            if any(e in h.metadata.get("source", "").lower() for e in wanted)
+        ]
+        hits = filtered or hits
     by_source: dict[str, list[Document]] = {}
     for h in hits:
         src = h.metadata.get("source", "?")
@@ -156,11 +174,7 @@ def _filename_fallback(question: str) -> list[Document]:
 def _build_docs_messages(question: str) -> tuple[list[BaseMessage] | None, str]:
     """Return (messages, fallback). When messages is None, fallback holds the reply."""
     ql = question.lower()
-    wanted_exts: list[str] = []
-    if "pdf" in ql:
-        wanted_exts.append(".pdf")
-    if any(w in ql for w in ("ppt", "powerpoint", "slide")):
-        wanted_exts.append(".pptx")
+    wanted_exts = _wanted_extensions(question)
     wanted_sources: list[str] = []
     if DOCS_DIR.exists():
         for p in DOCS_DIR.iterdir():
@@ -199,6 +213,8 @@ def _build_docs_messages(question: str) -> tuple[list[BaseMessage] | None, str]:
             "'is ppt me kya h'), summarize the key points from the context. "
             "3) Mention the source file name(s) used. "
             "4) Do NOT use emojis unless the user explicitly asks. "
+            "5) Be concise: keep the answer under about 200 words unless the "
+            "user explicitly asks for detail. "
             + _script_hint(question)
         ),
         HumanMessage(f"Context:\n{context}\n\nQuestion: {question}"),

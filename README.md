@@ -207,7 +207,7 @@ git -C hf-deploy add -A; git -C hf-deploy commit -m "Deploy"; git -C hf-deploy p
 | `GENFLOW_MODEL` | `qwen3:4b-instruct` | Ollama model |
 | `GENFLOW_BASE_URL` | `http://localhost:11434` | Ollama server |
 | `GENFLOW_DATA_DIR` | `./data` | chats.json + docs/ + index.json location |
-| `GENFLOW_NUM_PREDICT` | `400` | Max tokens per reply |
+| `GENFLOW_NUM_PREDICT` | `900` | Max tokens per reply |
 | `GENFLOW_NUM_CTX` | `2048` | Context window |
 | `GENFLOW_PASSWORD` | *(empty)* | Chat history lock (UI password) |
 
