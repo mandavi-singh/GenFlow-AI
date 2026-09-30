@@ -14,8 +14,11 @@ async def researcher(state: ResearchState) -> dict:
         get_llm(),
         tools=await get_tools(),
         prompt=SystemMessage(
-            "You are the Researcher. Use available tools (knowledge base, calculator, "
-            "notes) to investigate the query, then hand back findings as a concise report."
+            "You are the Researcher. Use available tools to investigate the query, "
+            "then hand back findings as a concise report. Prefer search_documents to "
+            "ground your findings in the user's own indexed documents when they are "
+            "relevant to the query. Use the calculator for any arithmetic. Hand back "
+            "findings as a concise report."
         ),
     )
     result = None

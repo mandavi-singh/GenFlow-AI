@@ -1,4 +1,6 @@
+import asyncio
 import secrets
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile
@@ -23,7 +25,35 @@ from genflow.store import (
     rename_chat,
 )
 
-app = FastAPI(title="GenFlow-AI")
+
+def _warmup_model() -> None:
+    """Ask Ollama to load the model into memory so the first request is not slow."""
+    import json as _json
+    import urllib.request
+    from urllib.error import URLError
+
+    payload = _json.dumps(
+        {"model": settings.model, "prompt": "", "stream": False}
+    ).encode()
+    try:
+        req = urllib.request.Request(
+            f"{settings.base_url}/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=180) as r:
+            r.read()
+    except (URLError, OSError, ValueError):
+        pass
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(asyncio.to_thread(_warmup_model))
+    yield
+
+
+app = FastAPI(title="GenFlow-AI", lifespan=lifespan)
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 

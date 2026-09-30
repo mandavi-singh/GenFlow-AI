@@ -35,7 +35,7 @@ Upload your own PDFs, PPTX or notes and query them in your own language, run mul
 | Feature | Description |
 |---|---|
 | **Chat** | Conversational AI with memory + persistent history (JSON store) |
-| **Research** | Multi-agent pipeline: researcher (ReAct + MCP tools) → writer → critic loop |
+| **Research** | Multi-agent pipeline: researcher (ReAct + tools) → writer → critic loop; grounds in your uploaded documents |
 | **Docs (RAG)** | Upload PDF / PPTX / TXT / MD — ask questions answered from your documents |
 | **Voice** | Local Whisper speech-to-text (mic) + browser text-to-speech |
 | **Hindi / Hinglish** | Roman typing → Hinglish reply; Hindi speech → natural Hindi reply |
@@ -135,7 +135,7 @@ genflow serve 0.0.0.0 8000
 ## Use
 
 1. **Chat tab** — type your question (mic button to speak it, speaker toggle for spoken answers)
-2. **Research tab** — deep multi-agent reports (30-90s: researcher → writer → critic loop)
+2. **Research tab** — deep multi-agent reports (2-5 min: researcher → writer → critic loop). The researcher searches your indexed documents, so upload files in the Docs tab first for grounded reports
 3. **Docs tab** — upload PDF/PPTX/TXT, then ask anything about them; filename mentions are routed to that exact file
 4. **Sidebar** — history: click to open, double-click to rename, x to delete, + for new chat
 5. **Model dropdown** (top-left) — switch models anytime

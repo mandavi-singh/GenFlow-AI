@@ -20,4 +20,19 @@ def summarize_notes(notes: str, max_words: int = 120) -> str:
     return " ".join(words[:max_words])
 
 
-LOCAL_TOOLS = [calculator, summarize_notes]
+@tool
+def search_documents(query: str, k: int = 6) -> str:
+    """Search the user's indexed documents (uploaded in the Docs tab) for passages
+    relevant to the query. Returns up to k passages, each prefixed by its source
+    filename. Use this to ground research in the user's own material."""
+    from genflow import rag
+
+    hits = rag.search(query, k=k)
+    if not hits:
+        return "No documents indexed. Tell the user to upload files in the Docs tab first."
+    return "\n\n".join(
+        f"[{h.metadata.get('source', '?')}]\n{h.page_content}" for h in hits
+    )
+
+
+LOCAL_TOOLS = [calculator, summarize_notes, search_documents]
