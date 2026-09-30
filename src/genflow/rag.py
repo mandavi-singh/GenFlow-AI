@@ -94,10 +94,11 @@ def ingest_directory(directory: Path | None = None) -> dict:
             docs.append(Document(page_content=chunk, metadata={"source": f.name, "chunk": i}))
     if not docs:
         return {"indexed_files": 0, "chunks": 0}
-    store = _get_store()
-    store.add_documents(docs)
+    global _store
+    _store = InMemoryVectorStore(_get_embeddings())
+    _store.add_documents(docs)
     INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    store.dump(str(INDEX_PATH))
+    _store.dump(str(INDEX_PATH))
     return {"indexed_files": len(files), "chunks": len(docs)}
 
 

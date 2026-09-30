@@ -22,9 +22,11 @@ def search_knowledge_base(query: str) -> str:
 @mcp.tool()
 def save_note(title: str, content: str) -> str:
     """Persist a research note under data/notes."""
+    import os
     from pathlib import Path
 
-    path = Path(__file__).resolve().parents[4] / "data" / "notes"
+    data_dir = Path(os.getenv("GENFLOW_DATA_DIR", Path(__file__).resolve().parents[3] / "data"))
+    path = data_dir / "notes"
     path.mkdir(parents=True, exist_ok=True)
     file = path / f"{title.replace(' ', '_')}.md"
     file.write_text(content, encoding="utf-8")
